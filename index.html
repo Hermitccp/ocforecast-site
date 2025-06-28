@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ocean City Surf Forecast</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f8fb;
+      margin: 0;
+      padding: 20px;
+    }
+    .forecast {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .day {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      position: relative;
+    }
+    .header {
+      font-size: 1.3rem;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .conditions {
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      color: white;
+      font-weight: bold;
+      display: inline-block;
+      text-transform: uppercase;
+    }
+    .flat { background-color: #777; }
+    .okay { background-color: #0077b6; }
+    .good { background-color: orange; }
+    .great { background-color: green; }
+    .epic { background-color: purple; color: white; }
+    .chart-container {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    .compass, .tide-chart {
+      width: 250px;
+    }
+    .compass canvas {
+      width: 100%;
+      height: 250px;
+    }
+    .key {
+      font-size: 0.9em;
+      margin-top: 8px;
+    }
+    .tide-info {
+      margin-top: 6px;
+      font-size: 0.9em;
+      color: #333;
+      line-height: 1.3;
+    }
+    .info-table {
+      margin-top: 10px;
+    }
+    .info-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .info-table td {
+      padding: 4px 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Ocean City, NJ Surf Forecast (June 28 – July 5, 2025)</h1>
+  <div class="forecast" id="forecast"></div>
+
+  <script>
+    const conditionsColorMap = {
+      flat: 'flat',
+      okay: 'okay',
+      good: 'good',
+      great: 'great',
+      epic: 'epic'
+    };
+
+    const forecastEl = document.getElementById('forecast');
+
+    function toCardinal(deg) {
+      const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      return dirs[Math.round(deg / 45) % 8];
+    }
+
+    function getWeekday(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { weekday: 'long' });
+    }
+
+    function drawCompass(id, windDir, swellDir) {
+      const ctx = document.getElementById(id).getContext('2d');
+      ctx.clearRect(0, 0, 250, 250);
+      ctx.resetTransform();
+      ctx.translate(125, 125);
+
+      // Draw base circle
+      ctx.beginPath();
+      ctx.arc(0, 0, 100, 0, 2 * Math.PI);
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Draw N, E, S, W labels
+      ctx.fillStyle = '#333';
+      ctx.font = '16px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('N', 0, -110);
+      ctx.fillText('E', 110, 0);
+      ctx.fillText('S', 0, 110);
+      ctx.fillText('W', -110, 0);
+
+      // Draw swell arrow (blue, points toward swell direction)
+      drawArrow(ctx, swellDir, 'blue');
+
+      // Draw wind arrow (red, points toward wind direction)
+      drawArrow(ctx, windDir, 'red');
+
+      ctx.resetTransform();
+    }
+
+    function drawArrow(ctx, deg, color) {
+      ctx.save();
+      ctx.rotate((deg - 90) * Math.PI / 180);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(80, 0);
+      ctx.lineTo(70, -10);
+      ctx.moveTo(80, 0);
+      ctx.lineTo(70, 10);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawTideChart(id, tides) {
+      const labels = [
+        '12 AM', '3 AM', '6 AM', '9 AM',
+        '12 PM', '3 PM', '6 PM', '9 PM', '12 AM'
+      ];
+
+      function timeToHour(t) {
+        const [time, meridian] = t.split(' ');
+        let [h, m] = time.split(':').map(Number);
+        if (meridian.toUpperCase() === 'PM' && h !== 12) h += 12;
+        if (meridian.toUpperCase() === 'AM' && h === 12) h = 0;
+        return h + m/60;
+      }
+
+      const hours = [];
+      for(let i=0; i<=24; i++) hours.push(i);
+
+      tides.sort((a,b) => timeToHour(a.time) - timeToHour(b.time));
+
+      function interpHeight(hour) {
+        for(let i=0; i < tides.length -1; i++) {
+          const h1 = timeToHour(tides[i].time);
+          const h2 = timeToHour(tides[i+1].time);
+          if(hour >= h1 && hour <= h2) {
+            const ratio = (hour - h1) / (h2 - h1);
+            return tides[i].height + ratio * (tides[i+1].height - tides[i].height);
+          }
+        }
+        if(hour < timeToHour(tides[0].time)) return tides[0].height;
+        if(hour > timeToHour(tides[tides.length-1].time)) return tides[tides.length-1].height;
+        return 0;
+      }
+
+      const dataPoints = hours.map(h => interpHeight(h));
+
+      const ctx = document.getElementById(id).getContext('2d');
+      if(window[id+'_chart']) window[id+'_chart'].destroy();
+
+      window[id+'_chart'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Tide Height (ft)',
+            data: [dataPoints[0], dataPoints[3], dataPoints[6], dataPoints[9], dataPoints[12], dataPoints[15], dataPoints[18], dataPoints[21], dataPoints[24]],
+            fill: false,
+            borderColor: 'navy',
+            tension: 0.4,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+          }]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true,
+              suggestedMax: 4,
+              ticks: {
+                stepSize: 1,
+                color: '#333'
+              },
+              grid: {
+                color: '#ddd'
+              }
+            },
+            x: {
+              ticks: {
+                color: '#333'
+              },
+              grid: {
+                color: '#ddd'
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            }
+          },
+          responsive: false,
+          maintainAspectRatio: false
+        }
+      });
+    }
+
+    function formatTideList(tides) {
+      if(!tides || tides.length === 0) return { highs: [], lows: [] };
+      // Sort by height ascending
+      const sortedByHeight = [...tides].sort((a,b) => a.height - b.height);
+      // Heuristics: lowest 2 = lows, highest 2 = highs (adjust if less than 4 points)
+      const lows = sortedByHeight.slice(0, Math.min(2, tides.length));
+      const highs = sortedByHeight.slice(-Math.min(2, tides.length));
+      return { highs, lows };
+    }
+
+    // Fetch data and render forecast
+    fetch('https://raw.githubusercontent.com/hermitccp/ocforecast/main/ocforecast.json')
+      .then(response => response.json())
+      .then(dayData => {
+        dayData.forEach((day, i) => {
+          const container = document.createElement('div');
+          container.className = 'day';
+
+          const compassId = `compass-${i}`;
+          const tideId = `tide-${i}`;
+
+          const { highs, lows } = formatTideList(day.tides);
+
+          const highLines = highs.map(tide => `<div><strong>High Tide:</strong> ${tide.time} — ${tide.height.toFixed(2)} ft</div>`).join('');
+          const lowLines = lows.map(tide => `<div><strong>Low Tide:</strong> ${tide.time} — ${tide.height.toFixed(2)} ft</div>`).join('');
+
+          container.innerHTML = `
+            <div class="header">${getWeekday(day.date)}, ${new Date(day.date).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })}</div>
+            <div class="conditions ${conditionsColorMap[day.condition]}">${day.condition.toUpperCase()}</div>
+            <div class="chart-container">
+              <div class="compass">
+                <canvas id="${compassId}" width="250" height="250"></canvas>
+                <div class="key">🟦 Swell →, 🟥 Wind ↑</div>
+                <div>Wind: ${day.windDir}° (${toCardinal(day.windDir)}), Swell: ${day.swellDir}° (${toCardinal(day.swellDir)})</div>
+              </div>
+              <div class="tide-chart">
+                <canvas id="${tideId}" width="400" height="200"></canvas>
+                <div class="tide-info">${highLines}${lowLines}</div>
+              </div>
+            </div>
+            <div class="info-table">
+              <table>
+                <tr><td><strong>Weather:</strong></td><td>${day.weather}</td></tr>
+                <tr><td><strong>Water Temp:</strong></td><td>${day.temp}°F</td></tr>
+                <tr><td><strong>UV Index:</strong></td><td>${day.uv}</td></tr>
+                <tr><td><strong>First Light:</strong></td><td>${day.light.first}</td></tr>
+                <tr><td><strong>Sunrise:</strong></td><td>${day.light.sunrise}</td></tr>
+                <tr><td><strong>Sunset:</strong></td><td>${day.light.sunset}</td></tr>
+                <tr><td><strong>Last Light:</strong></td><td>${day.light.last}</td></tr>
+              </table>
+            </div>
+          `;
+
+          forecastEl.appendChild(container);
+
+          drawCompass(compassId, day.windDir, day.swellDir);
+          drawTideChart(tideId, day.tides);
+        });
+      })
+      .catch(err => {
+        console.error('Failed to fetch surf forecast data:', err);
+        forecastEl.innerHTML = '<p>Error loading forecast data. Please try again later.</p>';
+      });
+  </script>
+</body>
+</html>
