@@ -1,3 +1,6 @@
+i have this code:
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -89,6 +92,52 @@
       great: 'great',
       epic: 'epic'
     };
+
+    const dayData = [
+      { date: '2025-06-28', condition: 'good', swellDir: 140, windDir: 60, weather: 'Partly cloudy, 76°F', tides: [
+        { time: '3:42 AM', height: 0.4 },
+        { time: '10:15 AM', height: 3.2 },
+        { time: '4:12 PM', height: 0.3 },
+        { time: '10:38 PM', height: 3.0 }
+      ], light: { first: '5:00 AM', sunrise: '5:32 AM', sunset: '8:28 PM', last: '9:00 PM' }, temp: 70, uv: 7 },
+      { date: '2025-06-29', condition: 'great', swellDir: 135, windDir: 45, weather: 'Sunny, 78°F', tides: [
+        { time: '4:21 AM', height: 0.5 },
+        { time: '10:52 AM', height: 3.4 },
+        { time: '4:53 PM', height: 0.4 },
+        { time: '11:18 PM', height: 3.1 }
+      ], light: { first: '5:01 AM', sunrise: '5:33 AM', sunset: '8:28 PM', last: '9:01 PM' }, temp: 71, uv: 8 },
+      { date: '2025-06-30', condition: 'epic', swellDir: 130, windDir: 90, weather: 'Sunny and warm, 80°F', tides: [
+        { time: '5:00 AM', height: 0.3 },
+        { time: '11:30 AM', height: 3.5 },
+        { time: '5:33 PM', height: 0.2 },
+        { time: '11:58 PM', height: 3.3 }
+      ], light: { first: '5:01 AM', sunrise: '5:34 AM', sunset: '8:27 PM', last: '9:00 PM' }, temp: 72, uv: 9 },
+      { date: '2025-07-01', condition: 'good', swellDir: 125, windDir: 110, weather: 'Cloudy, 75°F', tides: [
+        { time: '5:39 AM', height: 0.6 },
+        { time: '12:07 PM', height: 3.3 },
+        { time: '6:13 PM', height: 0.5 }
+      ], light: { first: '5:02 AM', sunrise: '5:35 AM', sunset: '8:27 PM', last: '9:00 PM' }, temp: 71, uv: 7 },
+      { date: '2025-07-02', condition: 'okay', swellDir: 110, windDir: 180, weather: 'Rain showers, 72°F', tides: [
+        { time: '6:19 AM', height: 0.8 },
+        { time: '12:45 PM', height: 3.1 },
+        { time: '6:53 PM', height: 0.7 }
+      ], light: { first: '5:03 AM', sunrise: '5:36 AM', sunset: '8:26 PM', last: '9:00 PM' }, temp: 70, uv: 5 },
+      { date: '2025-07-03', condition: 'great', swellDir: 115, windDir: 150, weather: 'Sunny, 79°F', tides: [
+        { time: '6:59 AM', height: 0.4 },
+        { time: '1:23 PM', height: 3.6 },
+        { time: '7:34 PM', height: 0.3 }
+      ], light: { first: '5:04 AM', sunrise: '5:37 AM', sunset: '8:26 PM', last: '8:59 PM' }, temp: 72, uv: 9 },
+      { date: '2025-07-04', condition: 'epic', swellDir: 120, windDir: 45, weather: 'Clear skies, 81°F', tides: [
+        { time: '7:38 AM', height: 0.3 },
+        { time: '2:01 PM', height: 3.7 },
+        { time: '8:15 PM', height: 0.2 }
+      ], light: { first: '5:05 AM', sunrise: '5:38 AM', sunset: '8:25 PM', last: '8:58 PM' }, temp: 73, uv: 10 },
+      { date: '2025-07-05', condition: 'good', swellDir: 110, windDir: 200, weather: 'Hot and sunny, 83°F', tides: [
+        { time: '8:17 AM', height: 0.6 },
+        { time: '2:40 PM', height: 3.4 },
+        { time: '8:56 PM', height: 0.5 }
+      ], light: { first: '5:06 AM', sunrise: '5:39 AM', sunset: '8:24 PM', last: '8:57 PM' }, temp: 74, uv: 9 }
+    ];
 
     const forecastEl = document.getElementById('forecast');
 
@@ -244,59 +293,57 @@
       return { highs, lows };
     }
 
-    // Fetch data and render forecast
-    fetch('https://raw.githubusercontent.com/hermitccp/ocforecast/main/ocforecast.json')
-      .then(response => response.json())
-      .then(dayData => {
-        dayData.forEach((day, i) => {
-          const container = document.createElement('div');
-          container.className = 'day';
+    dayData.forEach((day, i) => {
+      const container = document.createElement('div');
+      container.className = 'day';
 
-          const compassId = `compass-${i}`;
-          const tideId = `tide-${i}`;
+      const compassId = `compass-${i}`;
+      const tideId = `tide-${i}`;
 
-          const { highs, lows } = formatTideList(day.tides);
+      const { highs, lows } = formatTideList(day.tides);
 
-          const highLines = highs.map(tide => `<div><strong>High Tide:</strong> ${tide.time} — ${tide.height.toFixed(2)} ft</div>`).join('');
-          const lowLines = lows.map(tide => `<div><strong>Low Tide:</strong> ${tide.time} — ${tide.height.toFixed(2)} ft</div>`).join('');
+      const highLines = highs.map(tide => `<div><strong>High Tide:</strong> ${tide.time} — ${tide.height.toFixed(2)} ft</div>`).join('');
+      const lowLines = lows.map(tide => `<div><strong>Low Tide:</strong> ${tide.time} — ${tide.height.toFixed(2)} ft</div>`).join('');
 
-          container.innerHTML = `
-            <div class="header">${getWeekday(day.date)}, ${new Date(day.date).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })}</div>
-            <div class="conditions ${conditionsColorMap[day.condition]}">${day.condition.toUpperCase()}</div>
-            <div class="chart-container">
-              <div class="compass">
-                <canvas id="${compassId}" width="250" height="250"></canvas>
-                <div class="key">🟦 Swell →, 🟥 Wind ↑</div>
-                <div>Wind: ${day.windDir}° (${toCardinal(day.windDir)}), Swell: ${day.swellDir}° (${toCardinal(day.swellDir)})</div>
-              </div>
-              <div class="tide-chart">
-                <canvas id="${tideId}" width="400" height="200"></canvas>
-                <div class="tide-info">${highLines}${lowLines}</div>
-              </div>
-            </div>
-            <div class="info-table">
-              <table>
-                <tr><td><strong>Weather:</strong></td><td>${day.weather}</td></tr>
-                <tr><td><strong>Water Temp:</strong></td><td>${day.temp}°F</td></tr>
-                <tr><td><strong>UV Index:</strong></td><td>${day.uv}</td></tr>
-                <tr><td><strong>First Light:</strong></td><td>${day.light.first}</td></tr>
-                <tr><td><strong>Sunrise:</strong></td><td>${day.light.sunrise}</td></tr>
-                <tr><td><strong>Sunset:</strong></td><td>${day.light.sunset}</td></tr>
-                <tr><td><strong>Last Light:</strong></td><td>${day.light.last}</td></tr>
-              </table>
-            </div>
-          `;
+      container.innerHTML = `
+        <div class="header">${getWeekday(day.date)}, ${new Date(day.date).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })}</div>
+        <div class="conditions ${conditionsColorMap[day.condition]}">${day.condition.toUpperCase()}</div>
+        <div class="chart-container">
+          <div class="compass">
+            <canvas id="${compassId}" width="250" height="250"></canvas>
+            <div class="key">🟦 Swell , 🟥 Wind </div>
+            <div>Wind: ${day.windDir}° (${toCardinal(day.windDir)}), Swell: ${day.swellDir}° (${toCardinal(day.swellDir)})</div>
+          </div>
+          <div class="tide-chart">
+            <canvas id="${tideId}" width="400" height="200"></canvas>
+            <div class="tide-info">${highLines}${lowLines}</div>
+          </div>
+        </div>
+        <div class="info-table">
+          <table>
+            <tr><td><strong>Weather:</strong></td><td>${day.weather}</td></tr>
+            <tr><td><strong>Water Temp:</strong></td><td>${day.temp}°F</td></tr>
+            <tr><td><strong>UV Index:</strong></td><td>${day.uv}</td></tr>
+            <tr><td><strong>First Light:</strong></td><td>${day.light.first}</td></tr>
+            <tr><td><strong>Sunrise:</strong></td><td>${day.light.sunrise}</td></tr>
+            <tr><td><strong>Sunset:</strong></td><td>${day.light.sunset}</td></tr>
+            <tr><td><strong>Last Light:</strong></td><td>${day.light.last}</td></tr>
+          </table>
+        </div>
+      `;
 
-          forecastEl.appendChild(container);
+      forecastEl.appendChild(container);
 
-          drawCompass(compassId, day.windDir, day.swellDir);
-          drawTideChart(tideId, day.tides);
-        });
-      })
-      .catch(err => {
-        console.error('Failed to fetch surf forecast data:', err);
-        forecastEl.innerHTML = '<p>Error loading forecast data. Please try again later.</p>';
-      });
+      drawCompass(compassId, day.windDir, day.swellDir);
+      drawTideChart(tideId, day.tides);
+    });
   </script>
 </body>
 </html>
+
+
+
+
+
+i would lik to fetch data from an api that i have which is here:
+https://hermitccp.github.io/ocforecast/
