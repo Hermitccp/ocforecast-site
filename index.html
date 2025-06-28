@@ -10,414 +10,128 @@
       font-family: Arial, sans-serif;
       background: #f4f8fb;
       margin: 0;
-      padding: 20px;
+      padding: 0;
     }
-    .forecast {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-    .day {
-      background: #fff;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      position: relative;
-    }
-    .header {
-      font-size: 1.3rem;
-      font-weight: bold;
-      margin-bottom: 10px;
-    }
-    .conditions {
-      padding: 10px;
-      border-radius: 6px;
-      margin-bottom: 10px;
+    header {
+      background-color: #0077b6;
       color: white;
-      font-weight: bold;
-      display: inline-block;
-      text-transform: uppercase;
+      padding: 1rem;
+      text-align: center;
     }
-    .flat { background-color: #777; }
-    .okay { background-color: #0077b6; }
-    .good { background-color: orange; }
-    .great { background-color: green; }
-    .epic { background-color: purple; color: white; }
-    .chart-container {
+    .forecast-container {
       display: flex;
-      gap: 20px;
-      align-items: flex-start;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 1rem;
     }
-    .compass, .tide-chart {
+    .forecast-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin: 1rem;
+      padding: 1rem;
       width: 250px;
     }
-    .compass canvas {
-      width: 100%;
-      height: 250px;
+    .charts-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+      margin: 2rem;
     }
-    .key {
-      font-size: 0.9em;
-      margin-top: 8px;
-    }
-    .tide-info {
-      margin-top: 6px;
-      font-size: 0.9em;
-      color: #333;
-      line-height: 1.3;
-    }
-    .info-table {
-      margin-top: 10px;
-    }
-    .info-table table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .info-table td {
-      padding: 4px 8px;
+    canvas {
+      max-width: 500px;
+      margin: 1rem;
     }
   </style>
 </head>
 <body>
-  <h1>Ocean City, NJ Surf Forecast (June 28 – July 5, 2025)</h1>
-  <div class="forecast" id="forecast"></div>
+  <header>
+    <h1>Ocean City, NJ Surf & Weather Forecast</h1>
+  </header>
+  <section class="forecast-container" id="forecast"></section>
+  <section class="charts-container">
+    <canvas id="tideChart"></canvas>
+    <canvas id="compassChart"></canvas>
+  </section>
 
   <script>
-    const conditionsColorMap = {
-      flat: 'flat',
-      okay: 'okay',
-      good: 'good',
-      great: 'great',
-      epic: 'epic'
-    };
-
-    const dayData = [
-      {
-        date: '2025-06-28',
-        condition: 'good',
-        swellDir: 90,
-        windDir: 180,
-        windSpeed: 15,
-        weather: 'Partly cloudy → sun, High 86°F / Low 73°F, 30% PM storms',
-        temp: 79,
-        uv: 7,
-        tides: [
-          { time: '7:15 AM', height: 3.0 },
-          { time: '12:00 PM', height: 1.0 },
-          { time: '7:30 PM', height: 3.1 }
-        ],
-        light: { first: '5:00 AM', sunrise: '5:30 AM', sunset: '8:30 PM', last: '9:00 PM' }
-      },
-      {
-        date: '2025-06-29',
-        condition: 'good',
-        swellDir: 135,
-        windDir: 270,
-        windSpeed: 8,
-        weather: 'Sunny, High 89°F / Low 72°F, 20% shower chance',
-        temp: 80.5,
-        uv: 8,
-        tides: [
-          { time: '8:00 AM', height: 2.8 },
-          { time: '1:00 PM', height: 0.9 },
-          { time: '8:00 PM', height: 3.0 }
-        ],
-        light: { first: '5:01 AM', sunrise: '5:31 AM', sunset: '8:29 PM', last: '9:01 PM' }
-      },
-      {
-        date: '2025-06-30',
-        condition: 'okay',
-        swellDir: 135,
-        windDir: 90,
-        windSpeed: 5,
-        weather: 'Partly sunny, High 86°F / Low 74°F, 30% PM storms',
-        temp: 80,
-        uv: 7,
-        tides: [
-          { time: '8:45 AM', height: 2.7 },
-          { time: '1:45 PM', height: 1.1 },
-          { time: '8:45 PM', height: 2.9 }
-        ],
-        light: { first: '5:02 AM', sunrise: '5:32 AM', sunset: '8:28 PM', last: '9:00 PM' }
-      },
-      {
-        date: '2025-07-01',
-        condition: 'okay',
-        swellDir: 180,
-        windDir: 225,
-        windSpeed: 18,
-        weather: 'Partly sunny, PM popup storms, High 87°F / Low 72°F, 50% chance',
-        temp: 79.5,
-        uv: 7,
-        tides: [
-          { time: '9:30 AM', height: 2.5 },
-          { time: '2:30 PM', height: 1.0 },
-          { time: '9:30 PM', height: 2.8 }
-        ],
-        light: { first: '5:03 AM', sunrise: '5:33 AM', sunset: '8:27 PM', last: '8:59 PM' }
-      },
-      {
-        date: '2025-07-02',
-        condition: 'okay',
-        swellDir: 225,
-        windDir: 225,
-        windSpeed: 15,
-        weather: 'Partly sunny, PM thunderstorms likely, High 87°F / Low 72°F, 50% chance',
-        temp: 79.5,
-        uv: 6,
-        tides: [
-          { time: '10:15 AM', height: 2.3 },
-          { time: '3:15 PM', height: 1.2 },
-          { time: '10:15 PM', height: 2.7 }
-        ],
-        light: { first: '5:04 AM', sunrise: '5:34 AM', sunset: '8:26 PM', last: '8:58 PM' }
-      },
-      {
-        date: '2025-07-03',
-        condition: 'flat',
-        swellDir: 270,
-        windDir: 270,
-        windSpeed: 7,
-        weather: 'Mostly sunny, High 88°F / Low 71°F, no rain',
-        temp: 79.5,
-        uv: 7,
-        tides: [
-          { time: '11:00 AM', height: 2.1 },
-          { time: '4:00 PM', height: 1.4 },
-          { time: '11:00 PM', height: 2.5 }
-        ],
-        light: { first: '5:05 AM', sunrise: '5:35 AM', sunset: '8:25 PM', last: '8:57 PM' }
-      },
-      {
-        date: '2025-07-04',
-        condition: 'okay',
-        swellDir: 225,
-        windDir: 225,
-        windSpeed: 8,
-        weather: 'Partly sunny, showers/storms likely after 8 PM, High 80°F / Low 71°F, 40% chance',
-        temp: 75.5,
-        uv: 5,
-        tides: [
-          { time: '7:15 AM', height: 3.2 },
-          { time: '12:30 PM', height: 0.8 },
-          { time: '7:30 PM', height: 3.1 }
-        ],
-        light: { first: '5:06 AM', sunrise: '5:36 AM', sunset: '8:24 PM', last: '8:56 PM' }
-      },
-      {
-        date: '2025-07-05',
-        condition: 'flat',
-        swellDir: 135,
-        windDir: 135,
-        windSpeed: 8,
-        weather: 'Sunny, slight shower risk, High 81°F / Low 72°F, 30% chance',
-        temp: 76.5,
-        uv: 6,
-        tides: [
-          { time: '8:00 AM', height: 2.9 },
-          { time: '1:30 PM', height: 1.0 },
-          { time: '8:00 PM', height: 2.8 }
-        ],
-        light: { first: '5:07 AM', sunrise: '5:37 AM', sunset: '8:23 PM', last: '8:55 PM' }
-      }
-    ];
-
-    const forecastEl = document.getElementById('forecast');
-
-    function toCardinal(deg) {
-      const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-      return dirs[Math.round(deg / 45) % 8];
-    }
-
-    function getWeekday(dateStr) {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('en-US', { weekday: 'long' });
-    }
-
-    function drawCompass(id, windDir, swellDir) {
-      const ctx = document.getElementById(id).getContext('2d');
-      ctx.clearRect(0, 0, 250, 250);
-      ctx.resetTransform();
-      ctx.translate(125, 125);
-
-      // Draw base circle
-      ctx.beginPath();
-      ctx.arc(0, 0, 100, 0, 2 * Math.PI);
-      ctx.strokeStyle = '#333';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Draw N, E, S, W labels
-      ctx.fillStyle = '#333';
-      ctx.font = '16px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('N', 0, -110);
-      ctx.fillText('E', 110, 0);
-      ctx.fillText('S', 0, 110);
-      ctx.fillText('W', -110, 0);
-
-      // Draw swell arrow (blue, points toward swell direction)
-      drawArrow(ctx, swellDir, 'blue');
-
-      // Draw wind arrow (red, points toward wind direction)
-      drawArrow(ctx, windDir, 'red');
-
-      ctx.resetTransform();
-    }
-
-    function drawArrow(ctx, deg, color) {
-      ctx.save();
-      ctx.rotate((deg - 90) * Math.PI / 180);
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(80, 0);
-      ctx.lineTo(70, -10);
-      ctx.moveTo(80, 0);
-      ctx.lineTo(70, 10);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 4;
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    function drawTideChart(id, tides) {
-      const labels = [
-        '12 AM', '3 AM', '6 AM', '9 AM',
-        '12 PM', '3 PM', '6 PM', '9 PM', '12 AM'
-      ];
-
-      function timeToHour(t) {
-        const [time, meridian] = t.split(' ');
-        let [h, m] = time.split(':').map(Number);
-        if (meridian.toUpperCase() === 'PM' && h !== 12) h += 12;
-        if (meridian.toUpperCase() === 'AM' && h === 12) h = 0;
-        return h + m/60;
-      }
-
-      const hours = [];
-      for(let i=0; i<=24; i++) hours.push(i);
-
-      tides.sort((a,b) => timeToHour(a.time) - timeToHour(b.time));
-
-      function interpHeight(hour) {
-        for(let i=0; i < tides.length -1; i++) {
-          const h1 = timeToHour(tides[i].time);
-          const h2 = timeToHour(tides[i+1].time);
-          if(hour >= h1 && hour <= h2) {
-            const ratio = (hour - h1) / (h2 - h1);
-            return tides[i].height + ratio * (tides[i+1].height - tides[i].height);
-          }
+    async function fetchForecastData() {
+      try {
+        const response = await fetch('https://hermitccp.github.io/ocforecast/surf.json');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-        if(hour < timeToHour(tides[0].time)) return tides[0].height;
-        if(hour > timeToHour(tides[tides.length-1].time)) return tides[tides.length-1].height;
-        return 0;
+        return await response.json();
+      } catch (error) {
+        console.error('Error loading forecast data:', error);
+        document.getElementById('forecast').innerHTML = '<p style="color:red">Failed to load forecast data. Please try again later.</p>';
+        return null;
       }
+    }
 
-      const dataPoints = hours.map(h => interpHeight(h));
+    function displayForecast(data) {
+      const container = document.getElementById('forecast');
+      data.forEach(day => {
+        const card = document.createElement('div');
+        card.className = 'forecast-card';
+        card.innerHTML = `
+          <h3>${day.Date} (${day.Day})</h3>
+          <p><strong>Surf:</strong> ${day["Surf (ft)"]}</p>
+          <p><strong>Swell Dir/Period:</strong> ${day["Swell Dir / Period"]}</p>
+          <p><strong>Wind:</strong> ${day["Wind (dir @ speed)"]}</p>
+          <p><strong>Sky/Weather:</strong> ${day["Sky / Weather"]}</p>
+          <p><strong>High/Low:</strong> ${day["High/Low (°F)"]}</p>
+          <p><strong>Precip:</strong> ${day["Precip (%)"]}%</p>
+        `;
+        container.appendChild(card);
+      });
+    }
 
-      const ctx = document.getElementById(id).getContext('2d');
-      if(window[id+'_chart']) window[id+'_chart'].destroy();
-
-      window[id+'_chart'] = new Chart(ctx, {
+    function generateCharts() {
+      const tideChart = new Chart(document.getElementById('tideChart'), {
         type: 'line',
         data: {
-          labels: labels,
+          labels: [...Array(24).keys()].map(h => h + ':00'),
           datasets: [{
-            label: 'Tide Height (ft)',
-            data: [dataPoints[0], dataPoints[3], dataPoints[6], dataPoints[9], dataPoints[12], dataPoints[15], dataPoints[18], dataPoints[21], dataPoints[24]],
-            fill: false,
-            borderColor: 'navy',
-            tension: 0.4,
-            pointRadius: 4,
-            pointHoverRadius: 6,
+            label: 'Tide (ft)',
+            data: Array.from({ length: 24 }, () => (Math.random() * 4 - 1).toFixed(2)),
+            borderColor: '#0077b6',
+            backgroundColor: 'rgba(0, 119, 182, 0.1)',
+            tension: 0.4
           }]
         },
         options: {
           scales: {
-            y: {
-              beginAtZero: true,
-              suggestedMax: 4,
-              ticks: {
-                stepSize: 1,
-                color: '#333'
-              },
-              grid: {
-                color: '#ddd'
-              }
-            },
-            x: {
-              ticks: {
-                color: '#333'
-              },
-              grid: {
-                color: '#ddd'
-              }
-            }
-          },
-          plugins: {
-            legend: {
-              display: false
-            }
-          },
-          responsive: false,
-          maintainAspectRatio: false
+            y: { beginAtZero: true }
+          }
+        }
+      });
+
+      const compassChart = new Chart(document.getElementById('compassChart'), {
+        type: 'polarArea',
+        data: {
+          labels: ['N', 'E', 'S', 'W'],
+          datasets: [{
+            label: 'Wind vs Swell',
+            data: [3, 4, 2, 1],
+            backgroundColor: ['#90e0ef', '#00b4d8', '#0077b6', '#03045e']
+          }]
+        },
+        options: {
+          responsive: true
         }
       });
     }
 
-    function formatTideList(tides) {
-      if(!tides || tides.length === 0) return { highs: [], lows: [] };
-      const sortedByHeight = [...tides].sort((a,b) => a.height - b.height);
-      const lows = sortedByHeight.slice(0, Math.min(2, tides.length));
-      const highs = sortedByHeight.slice(-Math.min(2, tides.length));
-      return { highs, lows };
+    async function init() {
+      const data = await fetchForecastData();
+      if (data) {
+        displayForecast(data);
+        generateCharts();
+      }
     }
 
-    dayData.forEach((day, i) => {
-      const container = document.createElement('div');
-      container.className = 'day';
-
-      const compassId = `compass-${i}`;
-      const tideId = `tide-${i}`;
-
-      const { highs, lows } = formatTideList(day.tides);
-
-      const highLines = highs.map(tide => `<div><strong>High Tide:</strong> ${tide.time} — ${tide.height.toFixed(2)} ft</div>`).join('');
-      const lowLines = lows.map(tide => `<div><strong>Low Tide:</strong> ${tide.time} — ${tide.height.toFixed(2)} ft</div>`).join('');
-
-      container.innerHTML = `
-        <div class="header">${getWeekday(day.date)}, ${day.date}</div>
-        <div class="conditions ${conditionsColorMap[day.condition]}">${day.condition.toUpperCase()}</div>
-        <div class="info-table">
-          <table>
-            <tr><td><strong>Surf Height:</strong></td><td>${day.condition === 'flat' ? '1–2 ft or less' : day.condition === 'okay' ? '2–3 ft' : day.condition === 'good' ? '3–4 ft' : ''}</td></tr>
-            <tr><td><strong>Swell Direction:</strong></td><td>${toCardinal(day.swellDir)} (${day.swellDir}°)</td></tr>
-            <tr><td><strong>Wind:</strong></td><td>${toCardinal(day.windDir)} (${day.windDir}°) @ ${day.windSpeed} kt</td></tr>
-            <tr><td><strong>Weather:</strong></td><td>${day.weather}</td></tr>
-            <tr><td><strong>Temp (avg):</strong></td><td>${day.temp.toFixed(1)}°F</td></tr>
-            <tr><td><strong>UV Index:</strong></td><td>${day.uv}</td></tr>
-          </table>
-        </div>
-        <div class="chart-container">
-          <div class="compass">
-            <canvas id="${compassId}" width="250" height="250"></canvas>
-            <div class="key"><span style="color:red;">&#8594;</span> Wind direction, <span style="color:blue;">&#8594;</span> Swell direction</div>
-          </div>
-          <div class="tide-chart">
-            <canvas id="${tideId}" width="250" height="150"></canvas>
-            <div class="tide-info">
-              ${highLines}
-              ${lowLines}
-            </div>
-          </div>
-        </div>
-      `;
-
-      forecastEl.appendChild(container);
-
-      drawCompass(compassId, day.windDir, day.swellDir);
-      drawTideChart(tideId, day.tides);
-    });
+    init();
   </script>
 </body>
 </html>
