@@ -69,19 +69,19 @@
       }
     }
 
-    function displayForecast(data) {
+    function displayForecast(forecast) {
       const container = document.getElementById('forecast');
-      data.forEach(day => {
+      forecast.forEach(day => {
         const card = document.createElement('div');
         card.className = 'forecast-card';
         card.innerHTML = `
-          <h3>${day.Date} (${day.Day})</h3>
-          <p><strong>Surf:</strong> ${day["Surf (ft)"]}</p>
-          <p><strong>Swell Dir/Period:</strong> ${day["Swell Dir / Period"]}</p>
-          <p><strong>Wind:</strong> ${day["Wind (dir @ speed)"]}</p>
-          <p><strong>Sky/Weather:</strong> ${day["Sky / Weather"]}</p>
-          <p><strong>High/Low:</strong> ${day["High/Low (°F)"]}</p>
-          <p><strong>Precip:</strong> ${day["Precip (%)"]}%</p>
+          <h3>${day.date} (${day.day})</h3>
+          <p><strong>Surf:</strong> ${day.surf}</p>
+          <p><strong>Swell Dir/Period:</strong> ${day.swell}</p>
+          <p><strong>Wind:</strong> ${day.wind}</p>
+          <p><strong>Sky/Weather:</strong> ${day.weather}</p>
+          <p><strong>High/Low:</strong> ${day.high_low}</p>
+          <p><strong>Precip:</strong> ${day.precip}%</p>
         `;
         container.appendChild(card);
       });
@@ -113,7 +113,7 @@
           labels: ['N', 'E', 'S', 'W'],
           datasets: [{
             label: 'Wind vs Swell',
-            data: [3, 4, 2, 1],
+            data: [3, 4, 2, 1], // Placeholder
             backgroundColor: ['#90e0ef', '#00b4d8', '#0077b6', '#03045e']
           }]
         },
@@ -125,8 +125,8 @@
 
     async function init() {
       const data = await fetchForecastData();
-      if (data) {
-        displayForecast(data);
+      if (data && data.forecast) {
+        displayForecast(data.forecast);
         generateCharts();
       }
     }
