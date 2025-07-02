@@ -1,168 +1,135 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ocean City Surf Forecast</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f8fb;
-      margin: 0;
-      padding: 0;
-    }
-    header {
-      background: #0077b6;
-      color: white;
-      padding: 1rem;
-      text-align: center;
-    }
-    .forecast-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-      gap: 1rem;
-      padding: 1rem;
-    }
-    .card {
-      background: white;
-      border-radius: 10px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      padding: 1rem;
-      cursor: pointer;
-      transition: transform 0.2s ease;
-    }
-    .card:hover {
-      transform: scale(1.02);
-    }
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 1000;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0,0,0,0.5);
-      justify-content: center;
-      align-items: center;
-    }
-    .modal-content {
-      background: white;
-      padding: 2rem;
-      border-radius: 10px;
-      max-width: 600px;
-      width: 90%;
-    }
-    .close {
-      float: right;
-      cursor: pointer;
-      font-size: 1.2rem;
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Ocean City Surf Forecast</h1>
-  </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ocean City Surf Forecast</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #eef5f9;
+        color: #333;
+        margin: 0;
+        padding: 0;
+      }
+      header {
+        background-color: #0077b6;
+        color: white;
+        padding: 1rem;
+        text-align: center;
+      }
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        padding: 1rem;
+      }
+      .day-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        padding: 1rem;
+        cursor: pointer;
+      }
+      .rating {
+        font-weight: bold;
+        color: #0077b6;
+      }
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        justify-content: center;
+        align-items: center;
+      }
+      .modal-content {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        max-width: 600px;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Ocean City Surf Forecast</h1>
+    </header>
+    <div class="summary-grid" id="forecastGrid"></div>
 
-  <div class="forecast-grid" id="forecastGrid"></div>
-
-  <div class="modal" id="detailModal">
-    <div class="modal-content">
-      <span class="close" id="modalClose">&times;</span>
-      <div id="modalBody"></div>
+    <div class="modal" id="detailModal">
+      <div class="modal-content" id="modalContent"></div>
     </div>
-  </div>
 
-  <script>
-    const forecastUrl = "https://hermitccp.github.io/ocforecast/surf.json";
-    const tidesUrl = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=8534720&product=predictions&datum=MLLW&units=english&time_zone=lst_ldt&format=json&interval=h&begin_date=latest&range=72";
-    const sunriseUrl = (date, lat, lon) => `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&date=${date}&formatted=0`;
+    <script>
+      const forecastGrid = document.getElementById("forecastGrid");
+      const modal = document.getElementById("detailModal");
+      const modalContent = document.getElementById("modalContent");
 
-    async function fetchForecast() {
-      const [forecastRes, tideRes] = await Promise.all([
-        fetch(forecastUrl),
-        fetch(tidesUrl)
-      ]);
-      const forecastData = await forecastRes.json();
-      const tideData = await tideRes.json();
-      return { forecast: forecastData.forecast, tides: tideData.predictions };
-    }
+      async function loadForecast() {
+        try {
+          const surfRes = await fetch("https://hermitccp.github.io/ocforecast/surf.json");
+          const surfData = await surfRes.json();
 
-    function extractHighLows(tides) {
-      const highsLows = [];
-      for (let i = 1; i < tides.length - 1; i++) {
-        const prev = parseFloat(tides[i - 1].v);
-        const curr = parseFloat(tides[i].v);
-        const next = parseFloat(tides[i + 1].v);
-        if ((curr > prev && curr > next) || (curr < prev && curr < next)) {
-          highsLows.push({ time: tides[i].t, value: tides[i].v });
+          for (const day of surfData.forecast) {
+            const rating = calculateRating(day);
+
+            const card = document.createElement("div");
+            card.className = "day-card";
+            card.innerHTML = `
+              <h3>${day.day} ${day.date}</h3>
+              <p><strong>Surf:</strong> ${day.surf} ft</p>
+              <p><strong>Wind:</strong> ${day.wind}</p>
+              <p><strong>Swell:</strong> ${day.swell}</p>
+              <p><strong>Rating:</strong> <span class="rating">${rating}</span></p>
+            `;
+
+            card.addEventListener("click", () => showDetails(day, rating));
+            forecastGrid.appendChild(card);
+          }
+        } catch (err) {
+          forecastGrid.innerHTML = "<p>Error loading forecast. Try again later.</p>";
+          console.error("Forecast error:", err);
         }
       }
-      return highsLows;
-    }
 
-    function formatDate(dateStr) {
-      const date = new Date(dateStr);
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
+      function calculateRating(day) {
+        const surf = parseFloat(day.surf.split("–")[0]);
+        const wind = day.wind.toLowerCase();
+        const swell = day.swell.toLowerCase();
 
-    function renderForecast(forecast, tides) {
-      const grid = document.getElementById("forecastGrid");
-      grid.innerHTML = "";
-      const highsLows = extractHighLows(tides);
+        if (surf < 1) return "Flat";
+        if (surf < 2) return "Ok";
+        if (surf < 4 && swell.includes("e") && wind.includes("off")) return "Good";
+        if (surf >= 4 && swell.includes("e") && wind.includes("off")) return "Great";
+        if (surf >= 5 && wind.includes("light") && swell.includes("clean")) return "Epic";
+        return "Ok";
+      }
 
-      forecast.forEach((day, i) => {
-        const card = document.createElement("div");
-        card.className = "card";
-
-        const dateHighsLows = highsLows.filter(t => t.time.startsWith(day.date));
-        const tidesHtml = dateHighsLows.map(t => `<div>${formatDate(t.time)} — ${parseFloat(t.value).toFixed(2)} ft</div>`).join('');
-
-        card.innerHTML = `
-          <h3>${day.day} (${day.date})</h3>
-          <div><strong>Surf:</strong> ${day.surf} ft</div>
-          <div><strong>Swell:</strong> ${day.swell}</div>
-          <div><strong>Wind:</strong> ${day.wind}</div>
-          <div><strong>Best:</strong> ${day.best}</div>
-          <div><strong>Tides:</strong><br>${tidesHtml}</div>
+      function showDetails(day, rating) {
+        modalContent.innerHTML = `
+          <h2>${day.day} ${day.date}</h2>
+          <p><strong>Surf:</strong> ${day.surf}</p>
+          <p><strong>Swell:</strong> ${day.swell}</p>
+          <p><strong>Wind:</strong> ${day.wind}</p>
+          <p><strong>Rating:</strong> <span class="rating">${rating}</span></p>
+          <p><strong>Air Temp:</strong> ${day.air || 'N/A'}</p>
+          <p><strong>Water Temp:</strong> ${day.water || 'N/A'}</p>
+          <p><strong>Weather:</strong> ${day.weather || 'N/A'}</p>
+          <p><strong>Sunrise:</strong> ${day.sunrise || 'N/A'}, <strong>Sunset:</strong> ${day.sunset || 'N/A'}</p>
         `;
+        modal.style.display = "flex";
+      }
 
-        card.addEventListener("click", () => showDetails(day, dateHighsLows));
-        grid.appendChild(card);
+      modal.addEventListener("click", () => {
+        modal.style.display = "none";
       });
-    }
 
-    async function showDetails(day, tides) {
-      const modal = document.getElementById("detailModal");
-      const body = document.getElementById("modalBody");
-      const sunData = await fetch(sunriseUrl(day.date, 39.27, -74.57)).then(res => res.json()).then(d => d.results);
-
-      const tideHtml = tides.map(t => `<div>${formatDate(t.time)} — ${parseFloat(t.value).toFixed(2)} ft</div>`).join('');
-
-      body.innerHTML = `
-        <h2>${day.day} (${day.date})</h2>
-        <p><strong>Swell:</strong> ${day.swell}</p>
-        <p><strong>Wind:</strong> ${day.wind}</p>
-        <p><strong>Air Temp:</strong> ${day.temp}</p>
-        <p><strong>Water Temp:</strong> ${day.water || "68°F (est)"}</p>
-        <p><strong>Weather:</strong> ${day.weather}</p>
-        <p><strong>First Light:</strong> ${formatDate(sunData.civil_twilight_begin)}</p>
-        <p><strong>Sunrise:</strong> ${formatDate(sunData.sunrise)}</p>
-        <p><strong>Sunset:</strong> ${formatDate(sunData.sunset)}</p>
-        <p><strong>Last Light:</strong> ${formatDate(sunData.civil_twilight_end)}</p>
-        <h3>Tides</h3>
-        ${tideHtml}
-      `;
-      modal.style.display = "flex";
-    }
-
-    document.getElementById("modalClose").onclick = () => {
-      document.getElementById("detailModal").style.display = "none";
-    };
-
-    fetchForecast().then(data => renderForecast(data.forecast, data.tides));
-  </script>
-</body>
+      loadForecast();
+    </script>
+  </body>
 </html>
