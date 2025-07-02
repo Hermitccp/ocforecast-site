@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Surf Forecast</title>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Roboto', sans-serif; background: #eef2f5; color: #333; }
@@ -22,7 +22,7 @@
     .rating.blue { color: #60a5fa; }
     .rating.purple { color: #a78bfa; }
     .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; }
-    .modal-content { background: #fff; border-radius: 8px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; padding: 1.5rem; position: relative; }
+    .modal-content { background: #fff; border-radius: 8px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; padding: 1.5rem; position: relative; }
     .close { position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; }
     .compass-container { position: relative; width: 100%; height: 300px; }
     #compass { width: 100%; height: 100%; }
@@ -44,7 +44,7 @@
     <footer id="lastUpdated">Last updated: --</footer>
   </div>
 
-  <div id="detailModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="detailDate">
+  <div id="detailModal" class="modal" role="dialog" aria-labelledby="detailDate">
     <div class="modal-content">
       <button class="close" aria-label="Close modal">&times;</button>
       <h2 id="detailDate"></h2>
@@ -58,259 +58,134 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
+    // Simple geocode with Nominatim
     async function geocode(place) {
       const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}`);
       const data = await res.json();
-      if (!data || data.length === 0) throw new Error('Location not found');
-      return { lat: data[0].lat, lon: data[0].lon };
+      if (!data || !data.length) throw new Error('Location not found');
+      return data[0]; // { lat, lon }
     }
 
+    // Fetch NWS daily + hourly
     async function fetchNWS(lat, lon) {
       const pts = await fetch(`https://api.weather.gov/points/${lat},${lon}`).then(r => r.json());
-      if (!pts.properties) throw new Error('NWS Point lookup failed');
-      const forecastUrl = pts.properties.forecast;
-      const forecastHourlyUrl = pts.properties.forecastHourly;
-      if (!forecastUrl || !forecastHourlyUrl) throw new Error('Forecast URLs missing');
-      const daily = await fetch(forecastUrl).then(r => r.json()).then(j => j.properties.periods);
-      const hourly = await fetch(forecastHourlyUrl).then(r => r.json()).then(j => j.properties.periods);
+      const daily = await fetch(pts.properties.forecast).then(r => r.json()).then(j => j.properties.periods);
+      const hourly = await fetch(pts.properties.forecastHourly).then(r => r.json()).then(j => j.properties.periods);
       return { daily, hourly };
     }
 
-    async function fetchTides(stationId, beginDate, endDate) {
-      const url = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&application=web&begin_date=${beginDate}&end_date=${endDate}&station=${stationId}&time_zone=lst_ldt&units=english&interval=hilo&format=json`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to fetch tides');
-      const data = await res.json();
-      return data.predictions || [];
+    // Rating based on swell ft and wind kt
+    function getRating({ swell, wind }) {
+      const score = swell * 1 - wind / 10;
+      if (score < 3) return { label:'Flat', color:'gray' };
+      if (score < 6) return { label:'Okay', color:'yellow' };
+      if (score < 9) return { label:'Good', color:'green' };
+      if (score <12) return { label:'Great', color:'blue' };
+      return { label:'Epic', color:'purple' };
     }
 
-    function getRating({ swell, windSpeed, period }) {
-      const score = (swell || 0) * (period || 1) / 10 - (windSpeed || 0) / 10;
-      if (score < 3) return { label: 'Flat', color: 'gray' };
-      if (score < 6) return { label: 'Okay', color: 'yellow' };
-      if (score < 9) return { label: 'Good', color: 'green' };
-      if (score < 12) return { label: 'Great', color: 'blue' };
-      return { label: 'Epic', color: 'purple' };
-    }
-
-    function datePart(datetime) {
-      return datetime.split('T')[0];
-    }
-
-    function ratingScore(label) {
-      switch (label) {
-        case 'Flat': return 0;
-        case 'Okay': return 1;
-        case 'Good': return 2;
-        case 'Great': return 3;
-        case 'Epic': return 4;
-        default: return 0;
-      }
-    }
-
-    const stationOceanCity = '8570282'; // Ocean City Fishing Pier NOAA station
-
-    function drawArrow(ctx, color, lineWidth, arrowSize) {
-      ctx.clearRect(0, 0, 20, 20);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
-      ctx.beginPath();
-      ctx.moveTo(10, 18);
-      ctx.lineTo(10, 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(10, 2);
-      ctx.lineTo(10 - arrowSize / 2, 2 + arrowSize);
-      ctx.lineTo(10 + arrowSize / 2, 2 + arrowSize);
-      ctx.closePath();
-      ctx.fillStyle = color;
-      ctx.fill();
-    }
-
-    let compassChart = null;
-    const compassCtx = document.getElementById('compass').getContext('2d');
-
-    function updateCompass(hour) {
-      if (compassChart) {
-        compassChart.destroy();
-        compassChart = null;
-      }
-
-      const labels = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-
-      // swell direction estimate: approximate from wind direction for demo (NWS doesn't provide swell dir)
-      const swellDir = hour.windDirection?.value ?? 0;
-      const windDir = hour.windDirection?.value ?? 0;
-
-      // swell height from shortForecast, fallback 0
-      let swellHeight = 0;
-      const swellMatch = hour.shortForecast?.match(/(\d+)-?(\d*) ft/);
-      if (swellMatch) swellHeight = parseFloat(swellMatch[1]);
-
-      const windSpeed = hour.windSpeed?.value ?? 0;
-
-      function dirToIndex(deg) {
-        return Math.round(deg / 45) % 8;
-      }
-
-      const swellData = new Array(8).fill(0);
-      const windData = new Array(8).fill(0);
-      swellData[dirToIndex(swellDir)] = swellHeight;
-      windData[dirToIndex(windDir)] = windSpeed / 5;
-
-      compassChart = new Chart(compassCtx, {
-        type: 'polarArea',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: 'Swell',
-              data: swellData,
-              backgroundColor: 'rgba(51, 51, 51, 0.7)'
-            },
-            {
-              label: 'Wind',
-              data: windData,
-              backgroundColor: 'rgba(170, 170, 170, 0.7)'
-            }
-          ]
-        },
-        options: {
-          plugins: { legend: { display: true } },
-          scales: { r: { beginAtZero: true } }
-        }
-      });
-    }
-
-    function showDetail(day, hours, tideDay) {
-      const modal = document.getElementById('detailModal');
-      modal.style.display = 'flex';
-      modal.setAttribute('aria-hidden', 'false');
-      document.getElementById('detailDate').textContent = day.name;
-
-      const tideHigh = tideDay.find(t => t.type === 'H');
-      const tideLow = tideDay.find(t => t.type === 'L');
-      const statsDiv = document.getElementById('detailStats');
-      statsDiv.innerHTML = `
-        <p>${day.shortForecast}</p>
-        <p>Tide High: ${tideHigh ? tideHigh.v : 'N/A'} ft, Tide Low: ${tideLow ? tideLow.v : 'N/A'} ft</p>
-      `;
-
-      const slider = document.getElementById('hourSlider');
-      slider.max = hours.length - 1;
-      slider.value = 0;
-      slider.oninput = () => updateCompass(hours[slider.value]);
-
-      updateCompass(hours[0]);
-
-      drawArrow(document.getElementById('swellKey').getContext('2d'), '#333', 3, 8);
-      drawArrow(document.getElementById('windKey').getContext('2d'), '#aaa', 2, 6);
-    }
-
-    function ratingFromHour(hour) {
-      // parse swell from shortForecast string
-      let swell = 0;
-      const match = hour.shortForecast?.match(/(\d+)-?(\d*) ft/);
-      if (match) swell = parseFloat(match[1]);
-      const windSpeed = hour.windSpeed?.value ?? 0;
-      const period = 10; // default period
-      return getRating({ swell, windSpeed, period });
-    }
-
-    function renderDays(daily, hourly, tides) {
-      const dayList = document.getElementById('dayList');
-      dayList.innerHTML = '';
-
-      // Group tides by date
-      const tidesByDate = {};
-      tides.forEach(t => {
-        const dt = t.t.split(' ')[0];
-        if (!tidesByDate[dt]) tidesByDate[dt] = [];
-        tidesByDate[dt].push(t);
-      });
-
-      // Group hourly by date
-      const hourlyByDate = {};
-      hourly.forEach(h => {
-        const d = datePart(h.startTime);
-        if (!hourlyByDate[d]) hourlyByDate[d] = [];
-        hourlyByDate[d].push(h);
-      });
-
-      daily.slice(0, 10).forEach(day => {
-        const dateKey = datePart(day.startTime);
-        const hours = hourlyByDate[dateKey] || [];
-        if (hours.length === 0) return;
-
-        // Find best hour by rating score
-        let bestHour = hours[0];
-        let bestRating = ratingFromHour(bestHour);
-
-        for (const h of hours) {
-          const r = ratingFromHour(h);
-          if (ratingScore(r.label) > ratingScore(bestRating.label)) {
-            bestRating = r;
-            bestHour = h;
-          }
-        }
-
-        const tideDay = tidesByDate[dateKey] || [];
-        const tideHigh = tideDay.find(t => t.type === 'H');
-        const tideLow = tideDay.find(t => t.type === 'L');
-
-        const card = document.createElement('div');
-        card.className = 'day-card';
-        card.innerHTML = `
-          <div><strong>${day.name}</strong></div>
-          <div class="rating ${bestRating.color}">${bestRating.label} @ ${new Date(bestHour.startTime).getHours()}:00</div>
-          <div>Tide H: ${tideHigh ? tideHigh.v : 'N/A'} ft / L: ${tideLow ? tideLow.v : 'N/A'} ft</div>
-          <div>Swell Est: ${bestHour.shortForecast?.match(/(\\d+)-?(\\d*) ft/) ? bestHour.shortForecast.match(/(\\d+)-?(\\d*) ft/)[0] : 'N/A'}</div>
-        `;
-
-        card.onclick = () => showDetail(day, hours, tideDay);
-        dayList.appendChild(card);
-      });
-
-      document.getElementById('lastUpdated').textContent = 'Last updated: ' + new Date().toLocaleString();
-    }
-
-    document.querySelector('.close').addEventListener('click', () => {
-      const modal = document.getElementById('detailModal');
-      modal.style.display = 'none';
-      modal.setAttribute('aria-hidden', 'true');
-    });
+    // Helper to parse date part
+    const datePart = dt => dt.split('T')[0];
 
     document.getElementById('searchBtn').addEventListener('click', async () => {
-      const locationInput = document.getElementById('locationInput');
-      const place = locationInput.value.trim();
-      if (!place) {
-        alert('Please enter a location.');
-        return;
-      }
-
+      const place = document.getElementById('locationInput').value;
       try {
-        const { lat, lon } = await geocode(place);
-        const nwsData = await fetchNWS(lat, lon);
-
-        const today = new Date();
-        const beginDate = today.toISOString().slice(0, 10).replace(/-/g, '');
-        const endDateObj = new Date(today.getTime() + 9 * 24 * 3600 * 1000);
-        const endDate = endDateObj.toISOString().slice(0, 10).replace(/-/g, '');
-
-        // Using Ocean City station as default for tides; for a real app you'd want to find nearest station by lat/lon
-        const tidesData = await fetchTides(stationOceanCity, beginDate, endDate);
-
-        renderDays(nwsData.daily, nwsData.hourly, tidesData);
-      } catch (err) {
-        alert('Error fetching forecast: ' + err.message);
+        const loc = await geocode(place);
+        const nws = await fetchNWS(loc.lat, loc.lon);
+        renderDays(nws.daily, nws.hourly);
+        document.getElementById('lastUpdated').textContent = 'Last updated: ' + new Date().toLocaleString();
+      } catch (e) {
+        alert('Error: '+e.message);
       }
     });
 
-    // Optional: pre-fill Ocean City and auto load on page load
-    window.addEventListener('load', () => {
-      document.getElementById('locationInput').value = 'Ocean City, NJ';
+    function renderDays(daily, hourly) {
+      const list = document.getElementById('dayList'); list.innerHTML = '';
+      const hoursByDate = {};
+      hourly.forEach(h => {
+        const d = datePart(h.startTime);
+        if (!hoursByDate[d]) hoursByDate[d] = [];
+        hoursByDate[d].push(h);
+      });
+
+      daily.slice(0,10).forEach(day => {
+        const d = datePart(day.startTime);
+        const hrs = hoursByDate[d]||[];
+        if (!hrs.length) return;
+        // find best hour
+        let best = hrs[0]; let bestR = getRating({ swell:0, wind:100 });
+        hrs.forEach(h => {
+          const swell = parseFloat((h.shortForecast.match(/(\d+)-?(\d*) ft/)||[])[1]||0);
+          const wind  = h.windSpeed.value||0;
+          const r = getRating({ swell, wind });
+          if (r.label==='Epic' || (r.label==='Great'&&bestR.label!=='Epic') ) { best=h; bestR=r; }
+        });
+        const card = document.createElement('div'); card.className='day-card';
+        card.innerHTML = `<div><strong>${day.name}</strong></div>
+                          <div class="rating ${bestR.color}">${bestR.label} @ ${new Date(best.startTime).getHours()}:00</div>`;
+        card.onclick = ()=>showDetail(day, hrs);
+        list.appendChild(card);
+      });
+    }
+
+    // Compass drawing
+    const compass = document.getElementById('compass');
+    const ctx = compass.getContext('2d');
+    function drawArrow(dir, length, color) {
+      const centerX = compass.width/2, centerY = compass.height/2;
+      const rad = (dir-90)*Math.PI/180;
+      const x2 = centerX + Math.cos(rad)*length;
+      const y2 = centerY + Math.sin(rad)*length;
+      ctx.strokeStyle = color; ctx.fillStyle=color; ctx.lineWidth=4;
+      ctx.beginPath(); ctx.moveTo(centerX,centerY); ctx.lineTo(x2,y2); ctx.stroke();
+      // arrow head
+      ctx.beginPath();
+      ctx.moveTo(x2,y2);
+      ctx.lineTo(x2 - Math.cos(rad+0.3)*10, y2 - Math.sin(rad+0.3)*10);
+      ctx.lineTo(x2 - Math.cos(rad-0.3)*10, y2 - Math.sin(rad-0.3)*10);
+      ctx.closePath(); ctx.fill();
+    }
+
+    function showDetail(day, hours) {
+      document.getElementById('detailModal').style.display='flex';
+      document.getElementById('detailDate').textContent = day.name;
+      document.getElementById('detailStats').innerHTML = `<p>${day.shortForecast}</p>`;
+      const slider = document.getElementById('hourSlider');
+      slider.max = hours.length-1; slider.value=0;
+      slider.oninput = ()=>updateCompass(hours[slider.value]);
+      updateCompass(hours[0]);
+      // legend arrows
+      ['swellKey','windKey'].forEach(id=>{
+        const c = document.getElementById(id).getContext('2d'); c.clearRect(0,0,20,20);
+      });
+      drawKey();
+    }
+
+    function updateCompass(hour) {
+      ctx.clearRect(0,0,compass.width,compass.height);
+      const swell = parseFloat((hour.shortForecast.match(/(\d+)-?(\d*) ft/)||[])[1]||0);
+      const wind  = hour.windSpeed.value||0;
+      const swellDir = hour.windDirection.value; // approximate
+      const windDir  = hour.windDirection.value;
+      drawArrow(swellDir, 100, '#333');
+      drawArrow(windDir, 70, '#aaa');
+    }
+
+    function drawKey() {
+      const sk = document.getElementById('swellKey').getContext('2d');
+      sk.strokeStyle='#333'; sk.lineWidth=3;
+      sk.beginPath(); sk.moveTo(10,18); sk.lineTo(10,5); sk.stroke();
+      sk.beginPath(); sk.moveTo(10,5); sk.lineTo(5,12); sk.lineTo(15,12); sk.closePath(); sk.fillStyle='#333'; sk.fill();
+      const wk = document.getElementById('windKey').getContext('2d');
+      wk.strokeStyle='#aaa'; wk.lineWidth=3;
+      wk.beginPath(); wk.moveTo(10,18); wk.lineTo(10,5); wk.stroke();
+      wk.beginPath(); wk.moveTo(10,5); wk.lineTo(5,12); wk.lineTo(15,12); wk.closePath(); wk.fillStyle='#aaa'; wk.fill();
+    }
+
+    document.querySelector('.close').onclick = ()=>{ document.getElementById('detailModal').style.display='none'; };
+    window.addEventListener('load', ()=>{
+      document.getElementById('locationInput').value='Ocean City, NJ';
       document.getElementById('searchBtn').click();
     });
   </script>
